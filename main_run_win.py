@@ -128,7 +128,6 @@ def upload():
                         3: ["被遮挡或无法识别"]
                     }.get(object_class_id, ["未知"])
 
-
                 violation_str = ", ".join(violation_types)
                 # 根据违规类型选择边界框颜色
                 red_violations = ['绝缘子未短接', '速插式安全带低挂高用', '速插式安全带松', '速插式安全带位置错误',
@@ -156,7 +155,6 @@ def upload():
                     assigned_violations = violation_types
                 else:
                     assigned_violations = []
-
 
                 # 添加检测信息
                 detection_info = {
@@ -203,4 +201,4 @@ def upload():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0',port=8888,debug=True)
+    app.run(host='0.0.0.0', port=8888, debug=True)
