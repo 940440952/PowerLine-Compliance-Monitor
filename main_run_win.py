@@ -12,36 +12,48 @@ import cv2
 from flask import Flask, jsonify  # flask库
 import time
 from io import BytesIO
-
+from torchvision.models import resnet50, ResNet50_Weights
 app = Flask(__name__)
 
-
-# 加载YOLO模型
-
-class CustomResNet50(nn.Module):
-    def __init__(self, num_classes=6, num_input_channels=3):
-        super(CustomResNet50, self).__init__()
-        # 加载预训练的ResNet50模型
-        self.original_model = resnet50()
-
-        # 替换第一层以接受自定义通道数的输入
-        self.original_model.conv1 = nn.Conv2d(num_input_channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
-
-        # 替换最后的全连接层
-        num_features = self.original_model.fc.in_features
-        self.original_model.fc = nn.Linear(num_features, num_classes)
+class SEBlock(nn.Module):
+    def __init__(self, channel, reduction=16):
+        super(SEBlock, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(channel, channel // reduction, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(channel // reduction, channel, bias=False),
+            nn.Sigmoid()
+        )
 
     def forward(self, x):
-        # 使用原始模型获得输出
-        x = self.original_model(x)
-        return x
+        b, c, _, _ = x.size()
+        y = self.avg_pool(x).view(b, c)
+        y = self.fc(y).view(b, c, 1, 1)
+        return x * y.expand_as(x)
+
+def se_resnet50(num_classes: int, pretrained_path=None):
+    model = resnet50()
+    for name, module in model.named_children():
+        if name == 'layer1' or name == 'layer2' or name == 'layer3' or name == 'layer4':
+            for basic_block in module:
+                channels = basic_block.conv2.out_channels
+                basic_block.add_module("se_block", SEBlock(channels))
+    num_features = model.fc.in_features
+    model.fc = nn.Linear(num_features, num_classes)
+
+    if pretrained_path:
+        model.load_state_dict(torch.load(pretrained_path, map_location=device))
+
+    model.eval()
+    return model
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = CustomResNet50(num_classes=6, num_input_channels=3).to(device)
+model = se_resnet50(num_classes=6, pretrained_path='se_resnet50_model_85.pth')
+model.to(device)
 
 # 加载训练好的模型参数
-model.load_state_dict(torch.load('resnet5.pth', map_location=device))
 ymodel = YOLO('yoloresult.pt')  # pretrained YOLOv8n model
 model.eval()  # 将模型设置为评估模式
 
@@ -56,8 +68,9 @@ def predict(model, images_tensor):
 
 
 transform = transforms.Compose([
-    transforms.Resize((224, 224)),
+    transforms.Resize((640, 640)),
     transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
 
 class_names = {0: '高空作业人员', 1: '绝缘子', 2: '绝缘子', 3: '绝缘子'}
@@ -90,28 +103,26 @@ def upload():
                 # 根据 YOLO 识别的类别进行不同处理
                 if object_class_id == 0:
                     # 正常流程，进行违规判别
-                    cropped_image = image.crop((x1, y1, x2, y2))
-                    images_tensor = transform(cropped_image)
+                    # cropped_image = image.crop((x1, y1, x2, y2))
+                    images_tensor = transform(image)
                     images_tensor = images_tensor.unsqueeze(0).to(device)
                     predictions = predict(model, images_tensor).squeeze(0)
-                    value = torch.where(predictions > 0.3, torch.ones_like(predictions),
+                    value = torch.where(predictions > 0.4, torch.ones_like(predictions),
                                         torch.zeros_like(predictions))
 
                     violation_types = []
+                    if value[0] == 1:
+                        violation_types.append('安全带低挂高用')
+                    if value[1] == 1:
+                        violation_types.append('安全带和速差带未系')
+                    if value[2] == 1:
+                        violation_types.append('正常')
                     if value[3] == 1:
-                        violation_types.append('速插式安全带未系')
-                    else:
-                        if value[0] == 1:
-                            violation_types.append('速插式安全带位置错误')
-                        if value[1] == 1:
-                            violation_types.append('速插式安全带松弛')
-                        if value[2] == 1:
-                            violation_types.append('速插式安全带低挂高用')
+                        violation_types.append('速差未锁止')
                     if value[4] == 1:
-                        violation_types.append('腰部安全带未系')
-                    else:
-                        if value[5] == 1:
-                            violation_types.append('腰部安全带低挂高用')
+                        violation_types.append('速差位置佩戴错误')
+                    if value[5] == 1:
+                        violation_types.append('速差低挂高用')
                     # violation_confidence = {
                     #     '速插式安全带位置错误': round(predictions[0].item(), 2),
                     #     '速插式安全带松弛': round(predictions[1].item(), 2),
@@ -130,8 +141,8 @@ def upload():
 
                 violation_str = ", ".join(violation_types)
                 # 根据违规类型选择边界框颜色
-                red_violations = ['绝缘子未短接', '速插式安全带低挂高用', '速插式安全带松', '速插式安全带位置错误',
-                                  '腰部安全带低挂高用']
+                red_violations = ['绝缘子未短接', '安全带低挂高用', '安全带和速差带未系', '速差未锁止',
+                                  '速差位置佩戴错误', '速差低挂高用']
                 orange_violations = ['被遮挡或无法识别']
                 green_violations = ['正常']
 
@@ -143,10 +154,6 @@ def upload():
                 elif any(violation in orange_violations for violation in violation_types):
                     color = (0, 165, 255)  # 橙色
                     violation_type = "无法判断"
-                # 检查是否'腰部安全带未系'和'速插式安全带未系'都出现
-                elif '腰部安全带未系' in violation_types and '速插式安全带未系' in violation_types:
-                    color = (0, 0, 255)  # 红色
-                    violation_type = "疑似违章"
                 else:
                     color = (0, 255, 0)  # 绿色
                     violation_type = "正常"
@@ -175,7 +182,7 @@ def upload():
                 # 使用 PIL 在边界框旁边添加中文文本
                 pil_image = Image.fromarray(cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB))
                 draw = ImageDraw.Draw(pil_image)
-                font = ImageFont.truetype("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", 40)  # 指定中文字体和大小
+                font = ImageFont.truetype("C:\\Windows\\Fonts\\Arial.ttf", 40)
                 text = f'ID: {bbox_id} 类别: {object_class_name}, 违规: {violation_str}'
                 draw.text((x1, y1 - 25), text, color[::-1], font=font)
                 cv_image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
@@ -201,4 +208,4 @@ def upload():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8888, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)

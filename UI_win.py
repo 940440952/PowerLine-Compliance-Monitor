@@ -88,7 +88,7 @@ right_frame.pack_propagate(False)
 paned_window.add(right_frame)
 
 # URL输入字段
-url_var = StringVar(root, value="http://127.0.0.1:8888/upload")
+url_var = StringVar(root, value="http://127.0.0.1:5000/upload")
 url_entry = tk.Entry(right_frame, textvariable=url_var, font=("Arial", 14), width=50)
 url_entry.pack(pady=20)
 
