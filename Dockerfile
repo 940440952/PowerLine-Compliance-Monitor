@@ -1,17 +1,18 @@
-# 使用官方Python镜像作为基础镜像
-FROM python:3.8
+# 使用官方PyTorch镜像作为基础镜像
+FROM pytorch/pytorch:latest
 
-# 安装系统依赖项
+# 设置非交互式安装，避免tzdata等包的配置交互
+ARG DEBIAN_FRONTEND=noninteractive
+
+# 安装系统依赖
 RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
-&& rm -rf /var/lib/apt/lists/*
+    libglib2.0-0 \
+    fonts-noto-cjk \
+    && rm -rf /var/lib/apt/lists/*
 
 # 设置工作目录
 WORKDIR /app
-
-# 安装PyTorch、torchvision和其他依赖
-# 使用清华大学镜像源来加速下载
-RUN pip install -i https://pypi.tuna.tsinghua.edu.cn/simple torch torchvision torchaudio
 
 # 安装Flask、Gunicorn、Numpy、Pillow、OpenCV和YOLO
 # 使用清华大学镜像源来加速下载
