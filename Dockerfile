@@ -19,7 +19,7 @@ WORKDIR /app
 RUN pip install -i https://pypi.tuna.tsinghua.edu.cn/simple flask gunicorn numpy Pillow opencv-python ultralytics
 
 # 复制所需文件到容器内的工作目录
-COPY main_run_linux.py yoloresult.pt se_resnet50_model_85.pth ./
+COPY main_run_linux.py yolov8_seg.pt ./
 
 # 暴露端口
 EXPOSE 8888
