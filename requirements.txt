@@ -1,0 +1,8 @@
+Flask==2.3.3
+gunicorn==20.1.0
+waitress==2.1.0
+torch==1.12.1+cu113
+torchvision==0.13.1+cu113
+ultralytics==8.2.81
+opencv-python==4.5.5.64
+Pillow==9.3.0
