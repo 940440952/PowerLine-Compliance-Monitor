@@ -38,4 +38,4 @@ python run.py
 - **test_images**: 用于存放需要推理的输入图片。
 - **output_images**: 用于保存推理完成后的结果图片。
 
-确保输入图片存放在 `test_images` 文件夹中，推理结果将自动保存到 `output_images` 文件夹中。
+确保输入图片存放在 `test_images` 文件夹中，推理结果将自动保存到 `output_images` 文件夹中，`app-run.log`为模型推理日志文件。
