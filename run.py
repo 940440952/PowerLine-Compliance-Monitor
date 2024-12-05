@@ -151,10 +151,10 @@ def process_folder(folder_path, output_folder):
 
 if __name__ == "__main__":
 
-    output_folder = './output_images/11'                            # 推理结果保存路径
+    output_folder = './output_images'               # 推理结果保存路径
 
     # image_path = ''
     # process_image(image_path, output_folder)      # 推理单张图片
 
-    folder_path = './test_images/11'
+    folder_path = './test_images'
     process_folder(folder_path, output_folder)    # 推理文件夹下的所有图片
