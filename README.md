@@ -9,8 +9,9 @@ docker build -t test .
 
 ### 运行 Docker 容器
 ```bash
-docker run -p 8888:8888 --gpus all --name testContainer test /bin/bash
+docker run -it -p 8888:8888 --gpus all --name testContainer test /bin/bash
 ```
+testContainer为容器名,test为镜像名.
 
 ### 启动 Gunicorn 服务
 ```bash
