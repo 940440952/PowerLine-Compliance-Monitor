@@ -1,17 +1,28 @@
 # 使用说明
 
 ## 1) 基于 Docker 的 Web 模型推理服务
-
 ### 构建 Docker 镜像
 ```bash
 docker build -t test .
 ```
-
-### 运行 Docker 容器
+### 可使用cp命令进行修改 Docker 容器，然后使用commit保存容器为新的Docker镜像
 ```bash
-docker run -it -p 8888:8888 --gpus all --name testContainer test /bin/bash
+docker cp F:/main_run_linux.py testContainer:./app
+docker commit testContainer test:v1
 ```
-testContainer为容器名,test为镜像名.
+### 保存Docker镜像到本地
+```bash
+docker save -o F:/docker_image/aidetect.tar test:v1
+```
+### 载入 Docker 镜像
+```bash
+docker load -i model_detect.tar
+```
+### 指定镜像运行 Docker 容器
+```bash
+docker run -it -p 8888:8888 --gpus all --name testContainer test:v1 /bin/bash
+```
+testContainer为容器名,test:v1为镜像名.
 
 ### 启动 Gunicorn 服务
 ```bash
@@ -20,7 +31,7 @@ python3 start_gunicorn.py
 
 访问服务后即可进行模型推理。
 
----
+------------------------------------------
 
 ## 2) 使用 PyCharm 或其他 IDE 的本地开发测试
 
